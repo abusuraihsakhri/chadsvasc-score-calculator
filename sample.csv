@@ -1,0 +1,6 @@
+patient_id,age,chf,hypertension,diabetes,stroke_tia,vascular_disease,female,hypertension_uncontrolled,abnormal_renal,abnormal_liver,bleeding_history,labile_inr,drugs,alcohol
+P001,72,0,1,1,0,0,0,0,0,0,0,0,0,0
+P002,45,0,0,0,0,0,1,0,0,0,0,0,0,0
+P003,80,1,1,1,1,1,1,1,0,0,0,0,0,0
+P004,68,0,1,0,0,0,0,0,0,0,0,0,0,0
+P005,55,0,0,0,0,0,0,0,0,0,0,0,0,0
