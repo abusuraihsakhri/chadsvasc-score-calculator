@@ -1,189 +1,78 @@
-# CHADSVASC Score Calculator
+# CHA2DS2-VASc & HAS-BLED Atrial Fibrillation Anticoagulation Calculator
 
-> **Domain:** Cardiovascular Medicine & Hemodynamic Analytics  
-> **Reference Guidelines & Standards:** `AHA/ACC Practice Guidelines & ESC Clinical Standards`
-
-<div align="center">
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
-
-</div>
+> **Domain:** Cardiology, Stroke Prevention & Hemostasis  
+> **Clinical Guidelines:** 2023 ACC/AHA/ACCP/HRS Atrial Fibrillation Guideline, 2024 ESC Guidelines for the Management of Atrial Fibrillation, Lip et al. (Chest 2010), Pisters et al. (Chest 2010)
 
 ---
 
-## 📖 What It Does
+## 📖 Clinical Overview
 
-CHA2DS2-VASc Score Calculator for atrial fibrillation stroke risk assessment.
+The **CHA2DS2-VASc & HAS-BLED Calculator** provides standardized clinical risk stratification for thromboembolic stroke and major bleeding risk in patients diagnosed with non-valvular atrial fibrillation (AF). 
 
-Implements the validated CHA2DS2-VASc scoring system (Lip et al., 2010) and
-the HAS-BLED bleeding risk score (Pisters et al., 2010) to support
-anticoagulation decision-making in non-valvular atrial fibrillation.
+By synthesizing thromboembolic predictors against modifiable and non-modifiable bleeding diathesis factors, the system generates concordant clinical guidance regarding oral anticoagulation (DOACs / VKAs) initiation versus active bleeding risk mitigation.
 
-References:
-    - Lip GY, Nieuwlaat R, Pisters R, Lane DA, Crijns HJ. Refining clinical
-      risk stratification for predicting stroke and thromboembolism in atrial
-      fibrillation using a novel risk factor-based approach. Chest. 2010;137(2):263-272.
-    - Pisters R, Lane DA, Nieuwlaat R, de Vos CB, Crijns HJ, Lip GY. A novel
-      user-friendly score (HAS-BLED) to assess 1-year risk of major bleeding in
-      patients with atrial fibrillation. Chest. 2010;138(5):1093-1100.
+### Scoring Systems
 
-Stdlib only — no external dependencies.
+#### 1. CHA2DS2-VASc Score (Thromboembolic Stroke Risk)
+| Factor | Criteria | Points |
+|:---|:---|:---|
+| **C** | Congestive Heart Failure / LVEF $\le 40\%$ | +1 |
+| **H** | Hypertension (or on antihypertensive therapy) | +1 |
+| **A2** | Age $\ge 75$ years | +2 |
+| **D** | Diabetes Mellitus | +1 |
+| **S2** | Prior Stroke, TIA, or Thromboembolism | +2 |
+| **V** | Vascular Disease (Prior MI, PAD, or Complex Aortic Plaque) | +1 |
+| **A** | Age 65 to 74 years | +1 |
+| **Sc** | Sex Category (Female) | +1 |
 
----
+*Max Score: 9 points.*
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+| Score | Adjusted Annual Stroke Risk | Anticoagulation Recommendation (AHA/ACC & ESC) |
+|:---|:---|:---|
+| **0 (Men) / 1 (Women)** | 0.0% – 0.2% | **Low Risk**: No oral anticoagulation recommended. |
+| **1 (Men) / 2 (Women)** | 0.6% – 1.3% | **Intermediate Risk**: Oral anticoagulation may be considered based on clinical judgment. |
+| **$\ge 2$ (Men) / $\ge 3$ (Women)** | 2.2% – 15.2% | **High Risk**: Oral anticoagulation strongly recommended (DOAC preferred over Warfarin). |
 
-### 🔬 Analytical Functions
+#### 2. HAS-BLED Score (1-Year Major Bleeding Risk)
+- **H**: Hypertension (uncontrolled, SBP > 160 mmHg) (+1)
+- **A**: Abnormal renal or liver function (+1 or +2)
+- **S**: Stroke history (+1)
+- **B**: Bleeding history or predisposition (+1)
+- **L**: Labile INRs (TTR < 60%) (+1)
+- **E**: Elderly (Age > 65) (+1)
+- **D**: Drugs (antiplatelets/NSAIDs) or Alcohol excess (+1 or +2)
 
-- **`calculate_chadsvasc()`**: Calculate the CHA2DS2-VASc score.
-
-Parameters
-----------
-chf : bool
-    Congestive heart failure (or LVEF <= 40%).  +1
-hypertension : bool
-    History of hypertension.  +1
-age : int or float
-    Patient age in years.  +2 if >= 75, +1 if 65-74, 0 otherwise.
-diabetes : bool
-    Diabetes mellitus.  +1
-stroke_tia : bool
-    Prior stroke, TIA, or thromboembolism.  +2
-vascular_disease : bool
-    Prior MI, peripheral artery disease, or aortic plaque.  +1
-female : bool
-    Female sex.  +1
-
-Returns
--------
-dict with keys:
-    score           – int, total CHA2DS2-VASc (0-9)
-    detail          – dict mapping factor name to points awarded
-    risk_percent    – float, estimated annual stroke risk %
-    risk_category   – str, one of "Low", "Low-Moderate", "Moderate-High"
-    anticoagulation – str, clinical guidance
-- **`calculate_hasbled()`**: Calculate the HAS-BLED score for 1-year major bleeding risk.
-
-Parameters
-----------
-hypertension_uncontrolled : bool
-    Uncontrolled hypertension (SBP > 160 mmHg).  +1
-abnormal_renal : bool
-    Abnormal renal function (dialysis, transplant, Cr > 2.26 mg/dL).  +1
-abnormal_liver : bool
-    Abnormal liver function (cirrhosis, bilirubin > 2x ULN, AST/ALT/ALP > 3x ULN).  +1
-stroke : bool
-    Prior stroke.  +1
-bleeding_history : bool
-    Bleeding history or predisposition (anaemia).  +1
-labile_inr : bool
-    Labile INRs (TTR < 60%).  +1
-elderly : bool
-    Age > 65.  +1
-drugs : bool
-    Concomitant drugs (antiplatelets, NSAIDs).  +1
-alcohol : bool
-    Alcohol excess (>= 8 drinks/week).  +1
-
-Returns
--------
-dict with keys:
-    score           – int, total HAS-BLED (0-9)
-    detail          – dict mapping factor name to points awarded
-    high_risk       – bool, True if score >= 3
-    guidance        – str, clinical guidance
-- **`assess_patient()`**: Combined CHA2DS2-VASc + HAS-BLED assessment.
-
-Returns a dict with 'chadsvasc' and 'hasbled' sub-dicts plus a
-'recommendation' string synthesising both scores.
-
----
-
-## 📐 Mathematical Formulation & Logic
-
-```text
-  STROKE_RISK = {
-  Calculate the CHA2DS2-VASc score.
-  score = sum(detail.values())
-  score = max(0, min(9, score))
-  if score == 0:
-```
+*Score $\ge 3$ represents high bleeding risk, warranting caution and regular clinical review rather than withholding anticoagulation.*
 
 ---
 
 ## 💻 CLI Quickstart & Usage
 
-### 1. Guided Interactive Mode
+### 1. Combined Clinical Assessment
 ```bash
-python cli.py
+python cli.py assess --age 72 --chf --hypertension --diabetes --female
 ```
 
-### 2. Direct Parameterized Evaluation
+### 2. Isolated CHA2DS2-VASc Calculation
 ```bash
-python cli.py --age <value> --chf <value> --hypertension <value> --diabetes <value>
+python cli.py chadsvasc --age 68 --stroke-tia --vascular-disease
 ```
 
-### Parameter Reference
-- `--age`: Specifies input measurement or parameter value.
-- `--chf`: Specifies input measurement or parameter value.
-- `--hypertension`: Specifies input measurement or parameter value.
-- `--diabetes`: Specifies input measurement or parameter value.
-- `--female`: Specifies input measurement or parameter value.
-- `--stroke-tia`: Specifies input measurement or parameter value.
-- `--vascular-disease`: Specifies input measurement or parameter value.
-- `--hypertension-uncontrolled`: Specifies input measurement or parameter value.
-- `--elderly`: Specifies input measurement or parameter value.
-- `--bleeding-history`: Specifies input measurement or parameter value.
-
-### Input Data Schema
-
-| Field | Description | Requirement |
-|:------|:------------|:------------|
-| `patient_id` | Parameter / observation metric | Required |
-| `age` | Parameter / observation metric | Required |
-| `chf` | Parameter / observation metric | Required |
-| `hypertension` | Parameter / observation metric | Required |
-| `diabetes` | Parameter / observation metric | Required |
-| `stroke_tia` | Parameter / observation metric | Required |
-| `vascular_disease` | Parameter / observation metric | Required |
-| `female` | Parameter / observation metric | Required |
-
----
-
-## 🛡️ Security & Enterprise Architecture
-
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
-
----
-
-## 🧪 Testing & Verification
-
-Run the automated test suite:
-
+### 3. Isolated HAS-BLED Calculation
 ```bash
-pytest -v
+python cli.py hasbled --hypertension-uncontrolled --elderly --bleeding-history
 ```
 
-Execute high-throughput batch simulation benchmarks:
-
+### 4. Batch Process Patient CSV Dataset
 ```bash
-python simulator.py --tasks 1000 --concurrency 8
+python cli.py batch -i sample.csv -o out_results.csv
 ```
 
 ---
 
-## 🐳 Container Deployment
+## 🧪 Verification & Testing
 
+Execute comprehensive unit tests via pytest:
 ```bash
-docker build -t chadsvasc-score-calculator .
-docker run -p 8000:8000 chadsvasc-score-calculator
+python -m pytest -p no:zarr
 ```
