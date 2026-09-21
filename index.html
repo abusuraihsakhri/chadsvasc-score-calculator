@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none';">
+  <meta name="description" content="Browser-based CHA2DS2-VASc, CHA2DS2-VA, and HAS-BLED calculator for atrial fibrillation risk assessment.">
+  <title>CHA2DS2-VASc & HAS-BLED Calculator</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <main class="page-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Atrial fibrillation risk assessment</p>
+        <h1>CHA<sub>2</sub>DS<sub>2</sub>-VASc & HAS-BLED</h1>
+        <p class="subtitle">Local, browser-only scoring. No patient data is transmitted or stored.</p>
+      </div>
+      <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch to dark mode" title="Toggle theme">
+        <span aria-hidden="true" id="theme-icon">◐</span>
+      </button>
+    </header>
+
+    <form id="calculator-form" novalidate>
+      <div class="dashboard-grid">
+        <section class="panel" aria-labelledby="stroke-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">Stroke risk</p>
+              <h2 id="stroke-heading">CHA<sub>2</sub>DS<sub>2</sub>-VASc</h2>
+            </div>
+            <span class="score-range">0–9</span>
+          </div>
+
+          <div class="age-row">
+            <label for="age">Age</label>
+            <div class="input-wrap">
+              <input id="age" name="age" type="number" min="0" max="130" step="1" inputmode="numeric" autocomplete="off" required placeholder="e.g. 72">
+              <span>years</span>
+            </div>
+            <p class="field-error" id="age-error" role="alert"></p>
+          </div>
+
+          <fieldset class="factor-grid compact-grid">
+            <legend>Risk factors</legend>
+            <label class="factor"><input type="checkbox" id="chf"><span><b>C</b> Heart failure / LV dysfunction</span></label>
+            <label class="factor"><input type="checkbox" id="hypertension"><span><b>H</b> Hypertension</span></label>
+            <label class="factor"><input type="checkbox" id="diabetes"><span><b>D</b> Diabetes mellitus</span></label>
+            <label class="factor"><input type="checkbox" id="stroke"><span><b>S₂</b> Stroke / TIA / embolism</span></label>
+            <label class="factor"><input type="checkbox" id="vascular"><span><b>V</b> Vascular disease</span></label>
+            <label class="factor"><input type="checkbox" id="female"><span><b>Sc</b> Female sex category</span></label>
+          </fieldset>
+        </section>
+
+        <section class="panel" aria-labelledby="bleeding-heading">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">Bleeding risk</p>
+              <h2 id="bleeding-heading">HAS-BLED</h2>
+            </div>
+            <span class="score-range">0–9</span>
+          </div>
+
+          <fieldset class="factor-grid">
+            <legend>Risk factors</legend>
+            <label class="factor"><input type="checkbox" id="hb-hypertension"><span><b>H</b> SBP &gt;160 mmHg</span></label>
+            <label class="factor"><input type="checkbox" id="renal"><span><b>A</b> Abnormal renal function</span></label>
+            <label class="factor"><input type="checkbox" id="liver"><span><b>A</b> Abnormal liver function</span></label>
+            <label class="factor"><input type="checkbox" id="bleeding"><span><b>B</b> Bleeding history / predisposition</span></label>
+            <label class="factor"><input type="checkbox" id="labile"><span><b>L</b> Labile INR</span></label>
+            <label class="factor"><input type="checkbox" id="drugs"><span><b>D</b> Antiplatelet / NSAID use</span></label>
+            <label class="factor"><input type="checkbox" id="alcohol"><span><b>D</b> Alcohol excess</span></label>
+          </fieldset>
+          <p class="derived-note">Stroke history and age &gt;65 are carried into HAS-BLED automatically.</p>
+        </section>
+
+        <section class="panel results-panel" aria-labelledby="results-heading" aria-live="polite">
+          <div class="panel-heading">
+            <div>
+              <p class="kicker">Calculated assessment</p>
+              <h2 id="results-heading">Results</h2>
+            </div>
+            <span class="status-pill neutral" id="risk-status">Ready</span>
+          </div>
+
+          <div class="score-cards">
+            <article class="score-card">
+              <span>CHA₂DS₂-VASc</span>
+              <strong id="cs-score">—</strong>
+              <small id="cs-category">Enter age to calculate</small>
+            </article>
+            <article class="score-card">
+              <span>CHA₂DS₂-VA</span>
+              <strong id="va-score">—</strong>
+              <small>ESC 2024 score</small>
+            </article>
+            <article class="score-card">
+              <span>HAS-BLED</span>
+              <strong id="hb-score">—</strong>
+              <small id="hb-category">Review flag at ≥3</small>
+            </article>
+          </div>
+
+          <div class="guidance-stack">
+            <div class="guidance-block">
+              <h3>ACC/AHA/ACCP/HRS 2023</h3>
+              <p id="acc-guidance">Calculate to view guidance.</p>
+            </div>
+            <div class="guidance-block">
+              <h3>ESC 2024</h3>
+              <p id="esc-guidance">Uses CHA₂DS₂-VA for anticoagulation decisions.</p>
+            </div>
+            <div class="guidance-block">
+              <h3>Bleeding risk</h3>
+              <p id="hb-guidance">HAS-BLED is intended to identify modifiable risk factors and follow-up needs.</p>
+            </div>
+          </div>
+
+          <details class="details-box">
+            <summary>Score breakdown</summary>
+            <div id="breakdown" class="breakdown"></div>
+          </details>
+        </section>
+      </div>
+
+      <div class="actions-bar">
+        <button class="primary-button" type="submit">Calculate scores</button>
+        <button class="secondary-button" type="reset">Reset</button>
+        <p>Educational/clinical decision support only. Confirm patient-specific indications, contraindications, and local guidance.</p>
+      </div>
+    </form>
+
+    <footer>
+      <span>References: 2023 ACC/AHA/ACCP/HRS AF guideline · 2024 ESC AF guideline · Lip 2010 · Pisters 2010</span>
+      <p class="footnote">* Historical stroke percentages are cohort estimates; contemporary absolute risk varies across populations.</p>
+    </footer>
+  </main>
+</body>
+</html>
