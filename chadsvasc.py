@@ -1,27 +1,19 @@
 #!/usr/bin/env python3
-"""
-CHA2DS2-VASc Score Calculator for atrial fibrillation stroke risk assessment.
+"""CHA2DS2-VASc, CHA2DS2-VA, and HAS-BLED scoring helpers.
 
-Implements the validated CHA2DS2-VASc scoring system (Lip et al., 2010) and
-the HAS-BLED bleeding risk score (Pisters et al., 2010) to support
-anticoagulation decision-making in non-valvular atrial fibrillation.
-
-References:
-    - Lip GY, Nieuwlaat R, Pisters R, Lane DA, Crijns HJ. Refining clinical
-      risk stratification for predicting stroke and thromboembolism in atrial
-      fibrillation using a novel risk factor-based approach. Chest. 2010;137(2):263-272.
-    - Pisters R, Lane DA, Nieuwlaat R, de Vos CB, Crijns HJ, Lip GY. A novel
-      user-friendly score (HAS-BLED) to assess 1-year risk of major bleeding in
-      patients with atrial fibrillation. Chest. 2010;138(5):1093-1100.
-
-Stdlib only — no external dependencies.
+The scoring arithmetic is deterministic and dependency-free. The returned
+clinical guidance is intentionally concise and is not a substitute for an
+individual treatment decision.
 """
 
-# ---------------------------------------------------------------------------
-# CHA2DS2-VASc scoring
-# ---------------------------------------------------------------------------
+from __future__ import annotations
 
-# Annual stroke risk percentages by CHA2DS2-VASc score (Lip 2010 Table 4)
+import math
+from typing import Any
+
+# Historical annual stroke-risk estimates commonly reproduced with the
+# CHA2DS2-VASc score. Absolute risk varies substantially across populations;
+# these values must not be treated as a current patient-specific prediction.
 STROKE_RISK = {
     0: 0.0,
     1: 1.3,
@@ -31,193 +23,179 @@ STROKE_RISK = {
     5: 6.7,
     6: 9.8,
     7: 9.6,
-    8: 12.5,
+    8: 6.7,
     9: 15.2,
 }
 
+TRUTHY_STRINGS = {"1", "true", "yes", "y"}
 
-def _boolish(val):
-    """Coerce various truthy representations to bool."""
-    if isinstance(val, bool):
-        return val
-    if isinstance(val, (int, float)):
-        return val != 0
-    if isinstance(val, str):
-        return val.strip().lower() in ("1", "true", "yes", "y")
-    return bool(val)
+
+def _boolish(value: Any) -> bool:
+    """Coerce common boolean representations without treating arbitrary text as true."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        return value.strip().lower() in TRUTHY_STRINGS
+    return bool(value)
+
+
+def _validate_age(age: Any) -> float:
+    """Return a finite age in years, rejecting implausible or malformed values."""
+    try:
+        parsed = float(age)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("age must be a number") from exc
+    if not math.isfinite(parsed):
+        raise ValueError("age must be finite")
+    if parsed < 0 or parsed > 130:
+        raise ValueError("age must be between 0 and 130 years")
+    return parsed
+
+
+def _stroke_guidance(score: int, female: bool, cha2ds2_va: int) -> tuple[str, str, str]:
+    """Return category plus guideline-oriented summaries for clinical AF."""
+    if female:
+        if score <= 1:
+            category = "Low"
+            acc = (
+                "ACC/AHA/ACCP/HRS 2023: female sex alone is a risk modifier; "
+                "this score alone does not indicate oral anticoagulation."
+            )
+        elif score == 2:
+            category = "Intermediate"
+            acc = (
+                "ACC/AHA/ACCP/HRS 2023: intermediate thromboembolic risk; "
+                "oral anticoagulation is reasonable within shared decision-making."
+            )
+        else:
+            category = "High"
+            acc = (
+                "ACC/AHA/ACCP/HRS 2023: thromboembolic risk is in the range where "
+                "oral anticoagulation is recommended for eligible patients."
+            )
+    else:
+        if score == 0:
+            category = "Low"
+            acc = (
+                "ACC/AHA/ACCP/HRS 2023: low thromboembolic risk; "
+                "oral anticoagulation is not indicated on this score alone."
+            )
+        elif score == 1:
+            category = "Intermediate"
+            acc = (
+                "ACC/AHA/ACCP/HRS 2023: intermediate thromboembolic risk; "
+                "oral anticoagulation is reasonable within shared decision-making."
+            )
+        else:
+            category = "High"
+            acc = (
+                "ACC/AHA/ACCP/HRS 2023: thromboembolic risk is in the range where "
+                "oral anticoagulation is recommended for eligible patients."
+            )
+
+    if cha2ds2_va == 0:
+        esc = "ESC 2024 (CHA2DS2-VA): low risk; oral anticoagulation is generally not recommended."
+    elif cha2ds2_va == 1:
+        esc = "ESC 2024 (CHA2DS2-VA): oral anticoagulation should be considered."
+    else:
+        esc = "ESC 2024 (CHA2DS2-VA): oral anticoagulation is recommended for eligible patients."
+
+    return category, acc, esc
 
 
 def calculate_chadsvasc(
-    chf=False,
-    hypertension=False,
-    age=0,
-    diabetes=False,
-    stroke_tia=False,
-    vascular_disease=False,
-    female=False,
-):
-    """
-    Calculate the CHA2DS2-VASc score.
-
-    Parameters
-    ----------
-    chf : bool
-        Congestive heart failure (or LVEF <= 40%).  +1
-    hypertension : bool
-        History of hypertension.  +1
-    age : int or float
-        Patient age in years.  +2 if >= 75, +1 if 65-74, 0 otherwise.
-    diabetes : bool
-        Diabetes mellitus.  +1
-    stroke_tia : bool
-        Prior stroke, TIA, or thromboembolism.  +2
-    vascular_disease : bool
-        Prior MI, peripheral artery disease, or aortic plaque.  +1
-    female : bool
-        Female sex.  +1
-
-    Returns
-    -------
-    dict with keys:
-        score           – int, total CHA2DS2-VASc (0-9)
-        detail          – dict mapping factor name to points awarded
-        risk_percent    – float, estimated annual stroke risk %
-        risk_category   – str, one of "Low", "Low-Moderate", "Moderate-High"
-        anticoagulation – str, clinical guidance
-    """
-    detail = {}
+    chf: Any = False,
+    hypertension: Any = False,
+    age: Any = 0,
+    diabetes: Any = False,
+    stroke_tia: Any = False,
+    vascular_disease: Any = False,
+    female: Any = False,
+) -> dict[str, Any]:
+    """Calculate CHA2DS2-VASc and the sex-independent CHA2DS2-VA score."""
+    age_value = _validate_age(age)
+    female_value = _boolish(female)
+    detail: dict[str, int] = {}
 
     if _boolish(chf):
-        detail["CHF"] = 1
+        detail["CHF/LV dysfunction"] = 1
     if _boolish(hypertension):
         detail["Hypertension"] = 1
-
-    age = float(age)
-    if age >= 75:
+    if age_value >= 75:
         detail["Age >= 75"] = 2
-    elif age >= 65:
+    elif age_value >= 65:
         detail["Age 65-74"] = 1
-
     if _boolish(diabetes):
         detail["Diabetes"] = 1
     if _boolish(stroke_tia):
-        detail["Stroke/TIA"] = 2
+        detail["Stroke/TIA/systemic embolism"] = 2
     if _boolish(vascular_disease):
         detail["Vascular disease"] = 1
-    if _boolish(female):
+    if female_value:
         detail["Female sex"] = 1
 
     score = sum(detail.values())
-    score = max(0, min(9, score))
-
-    risk_pct = STROKE_RISK.get(score, 0.0)
-
-    if score == 0:
-        category = "Low"
-        guidance = "No anticoagulation recommended."
-    elif score == 1:
-        category = "Low-Moderate"
-        guidance = "Consider oral anticoagulation; patient preference and bleeding risk should guide decision."
-    else:
-        category = "Moderate-High"
-        guidance = "Oral anticoagulation recommended (unless high bleeding risk)."
+    cha2ds2_va = score - (1 if female_value else 0)
+    category, acc_guidance, esc_guidance = _stroke_guidance(score, female_value, cha2ds2_va)
 
     return {
         "score": score,
+        "cha2ds2_va": cha2ds2_va,
         "detail": detail,
-        "risk_percent": risk_pct,
+        "risk_percent": STROKE_RISK[score],
+        "risk_percent_context": (
+            "Historical cohort estimate only; absolute annual risk varies across populations "
+            "and should not be used as a patient-specific prediction."
+        ),
         "risk_category": category,
-        "anticoagulation": guidance,
+        "anticoagulation": f"{acc_guidance} {esc_guidance}",
+        "guideline_guidance": {
+            "acc_aha_accp_hrs_2023": acc_guidance,
+            "esc_2024": esc_guidance,
+        },
     }
 
 
-# ---------------------------------------------------------------------------
-# HAS-BLED bleeding risk score
-# ---------------------------------------------------------------------------
-
 def calculate_hasbled(
-    hypertension_uncontrolled=False,
-    abnormal_renal=False,
-    abnormal_liver=False,
-    stroke=False,
-    bleeding_history=False,
-    labile_inr=False,
-    elderly=False,
-    drugs=False,
-    alcohol=False,
-):
-    """
-    Calculate the HAS-BLED score for 1-year major bleeding risk.
-
-    Parameters
-    ----------
-    hypertension_uncontrolled : bool
-        Uncontrolled hypertension (SBP > 160 mmHg).  +1
-    abnormal_renal : bool
-        Abnormal renal function (dialysis, transplant, Cr > 2.26 mg/dL).  +1
-    abnormal_liver : bool
-        Abnormal liver function (cirrhosis, bilirubin > 2x ULN, AST/ALT/ALP > 3x ULN).  +1
-    stroke : bool
-        Prior stroke.  +1
-    bleeding_history : bool
-        Bleeding history or predisposition (anaemia).  +1
-    labile_inr : bool
-        Labile INRs (TTR < 60%).  +1
-    elderly : bool
-        Age > 65.  +1
-    drugs : bool
-        Concomitant drugs (antiplatelets, NSAIDs).  +1
-    alcohol : bool
-        Alcohol excess (>= 8 drinks/week).  +1
-
-    Returns
-    -------
-    dict with keys:
-        score           – int, total HAS-BLED (0-9)
-        detail          – dict mapping factor name to points awarded
-        high_risk       – bool, True if score >= 3
-        guidance        – str, clinical guidance
-    """
-    detail = {}
-
-    if _boolish(hypertension_uncontrolled):
-        detail["Uncontrolled hypertension"] = 1
-
-    # Renal and liver are scored separately (max 2 for "A")
-    abnl_points = 0
-    if _boolish(abnormal_renal):
-        detail["Abnormal renal"] = 1
-        abnl_points += 1
-    if _boolish(abnormal_liver):
-        detail["Abnormal liver"] = 1
-        abnl_points += 1
-
-    if _boolish(stroke):
-        detail["Stroke"] = 1
-    if _boolish(bleeding_history):
-        detail["Bleeding history"] = 1
-    if _boolish(labile_inr):
-        detail["Labile INR"] = 1
-    if _boolish(elderly):
-        detail["Elderly (>65)"] = 1
-
-    # Drugs and alcohol are scored separately (max 2 for "D")
-    if _boolish(drugs):
-        detail["Drugs"] = 1
-    if _boolish(alcohol):
-        detail["Alcohol"] = 1
-
+    hypertension_uncontrolled: Any = False,
+    abnormal_renal: Any = False,
+    abnormal_liver: Any = False,
+    stroke: Any = False,
+    bleeding_history: Any = False,
+    labile_inr: Any = False,
+    elderly: Any = False,
+    drugs: Any = False,
+    alcohol: Any = False,
+) -> dict[str, Any]:
+    """Calculate HAS-BLED (0-9) and return interpretation guidance."""
+    factors = (
+        ("Uncontrolled hypertension", hypertension_uncontrolled),
+        ("Abnormal renal function", abnormal_renal),
+        ("Abnormal liver function", abnormal_liver),
+        ("Stroke history", stroke),
+        ("Bleeding history/predisposition", bleeding_history),
+        ("Labile INR", labile_inr),
+        ("Age > 65", elderly),
+        ("Drugs increasing bleeding risk", drugs),
+        ("Alcohol excess", alcohol),
+    )
+    detail = {name: 1 for name, value in factors if _boolish(value)}
     score = sum(detail.values())
-    score = max(0, min(9, score))
     high_risk = score >= 3
 
     if high_risk:
         guidance = (
-            "High bleeding risk (HAS-BLED >= 3). "
-            "Caution with anticoagulation; address modifiable risk factors."
+            "HAS-BLED >= 3 identifies increased bleeding risk and a need to address modifiable "
+            "risk factors and arrange closer review. The score should not be used by itself to "
+            "withhold or discontinue indicated anticoagulation."
         )
     else:
-        guidance = "Low-moderate bleeding risk. Bleeding risk should not preclude anticoagulation if indicated."
+        guidance = (
+            "Use HAS-BLED to identify modifiable bleeding risks and follow-up needs. "
+            "Do not use the score in isolation to decide for or against anticoagulation."
+        )
 
     return {
         "score": score,
@@ -227,87 +205,52 @@ def calculate_hasbled(
     }
 
 
-# ---------------------------------------------------------------------------
-# Combined clinical assessment
-# ---------------------------------------------------------------------------
-
 def assess_patient(
-    chf=False,
-    hypertension=False,
-    age=0,
-    diabetes=False,
-    stroke_tia=False,
-    vascular_disease=False,
-    female=False,
-    # HAS-BLED specific
-    hypertension_uncontrolled=False,
-    abnormal_renal=False,
-    abnormal_liver=False,
-    bleeding_history=False,
-    labile_inr=False,
-    drugs=False,
-    alcohol=False,
-):
-    """
-    Combined CHA2DS2-VASc + HAS-BLED assessment.
-
-    Returns a dict with 'chadsvasc' and 'hasbled' sub-dicts plus a
-    'recommendation' string synthesising both scores.
-    """
-    cs = calculate_chadsvasc(
+    chf: Any = False,
+    hypertension: Any = False,
+    age: Any = 0,
+    diabetes: Any = False,
+    stroke_tia: Any = False,
+    vascular_disease: Any = False,
+    female: Any = False,
+    hypertension_uncontrolled: Any = False,
+    abnormal_renal: Any = False,
+    abnormal_liver: Any = False,
+    bleeding_history: Any = False,
+    labile_inr: Any = False,
+    drugs: Any = False,
+    alcohol: Any = False,
+) -> dict[str, Any]:
+    """Return a combined stroke-risk and bleeding-risk assessment."""
+    age_value = _validate_age(age)
+    stroke = calculate_chadsvasc(
         chf=chf,
         hypertension=hypertension,
-        age=age,
+        age=age_value,
         diabetes=diabetes,
         stroke_tia=stroke_tia,
         vascular_disease=vascular_disease,
         female=female,
     )
-
-    hb = calculate_hasbled(
+    bleeding = calculate_hasbled(
         hypertension_uncontrolled=hypertension_uncontrolled,
         abnormal_renal=abnormal_renal,
         abnormal_liver=abnormal_liver,
-        stroke=stroke_tia,  # stroke history is shared
+        stroke=stroke_tia,
         bleeding_history=bleeding_history,
         labile_inr=labile_inr,
-        elderly=(age > 65),
+        elderly=age_value > 65,
         drugs=drugs,
         alcohol=alcohol,
     )
 
-    # Synthesise recommendation
-    if cs["score"] == 0:
-        rec = (
-            "CHA2DS2-VASc = 0 (low stroke risk). "
-            "No anticoagulation recommended regardless of bleeding risk."
-        )
-    elif cs["score"] == 1:
-        if hb["high_risk"]:
-            rec = (
-                "CHA2DS2-VASc = 1 (low-moderate stroke risk) but HAS-BLED >= 3 (high bleeding risk). "
-                "Discuss risks/benefits with patient; anticoagulation may be withheld."
-            )
-        else:
-            rec = (
-                "CHA2DS2-VASc = 1 (low-moderate stroke risk). "
-                "Consider anticoagulation; patient preference important."
-            )
-    else:
-        if hb["high_risk"]:
-            rec = (
-                f"CHA2DS2-VASc = {cs['score']} (moderate-high stroke risk, "
-                f"{cs['risk_percent']}% annual) with HAS-BLED = {hb['score']} (high bleeding risk). "
-                "Anticoagulation still generally recommended; address modifiable bleeding risk factors."
-            )
-        else:
-            rec = (
-                f"CHA2DS2-VASc = {cs['score']} (moderate-high stroke risk, "
-                f"{cs['risk_percent']}% annual). Anticoagulation recommended."
-            )
-
+    recommendation = (
+        f"{stroke['guideline_guidance']['acc_aha_accp_hrs_2023']} "
+        f"{stroke['guideline_guidance']['esc_2024']} {bleeding['guidance']}"
+    )
     return {
-        "chadsvasc": cs,
-        "hasbled": hb,
-        "recommendation": rec,
+        "chadsvasc": stroke,
+        "hasbled": bleeding,
+        "recommendation": recommendation,
+        "disclaimer": "Clinical decision support only; confirm patient-specific indications and contraindications.",
     }
