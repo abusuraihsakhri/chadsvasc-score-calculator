@@ -1,78 +1,66 @@
-# CHA2DS2-VASc & HAS-BLED Atrial Fibrillation Anticoagulation Calculator
+# CHA₂DS₂-VASc & HAS-BLED Calculator
 
-> **Domain:** Cardiology, Stroke Prevention & Hemostasis  
-> **Clinical Guidelines:** 2023 ACC/AHA/ACCP/HRS Atrial Fibrillation Guideline, 2024 ESC Guidelines for the Management of Atrial Fibrillation, Lip et al. (Chest 2010), Pisters et al. (Chest 2010)
+### [Open the Live Application →](https://abusuraihsakhri.github.io/chadsvasc-score-calculator/)
 
----
+A browser and command-line calculator for atrial-fibrillation stroke-risk and bleeding-risk assessment. It calculates CHA₂DS₂-VASc, the 2024 ESC CHA₂DS₂-VA score, and HAS-BLED, with concise guideline-oriented interpretation.
 
-## 📖 Clinical Overview
+## Features
 
-The **CHA2DS2-VASc & HAS-BLED Calculator** provides standardized clinical risk stratification for thromboembolic stroke and major bleeding risk in patients diagnosed with non-valvular atrial fibrillation (AF). 
+- CHA₂DS₂-VASc scoring from 0–9, including sex-specific interpretation consistent with the 2023 ACC/AHA/ACCP/HRS atrial fibrillation guideline.
+- CHA₂DS₂-VA scoring from 0–8 for the 2024 ESC atrial fibrillation approach.
+- HAS-BLED scoring from 0–9. A score ≥3 is presented as a flag for modifiable bleeding risks and closer review, not as a reason by itself to withhold indicated anticoagulation.
+- Historical CHA₂DS₂-VASc stroke-rate estimates are displayed with an explicit population-estimate caveat.
+- Responsive browser interface with light/dark themes and an explicit **Calculate scores** action.
+- Dependency-free Python CLI for single-patient and CSV batch workflows.
+- Input validation and spreadsheet formula-injection protection for echoed CSV fields.
 
-By synthesizing thromboembolic predictors against modifiable and non-modifiable bleeding diathesis factors, the system generates concordant clinical guidance regarding oral anticoagulation (DOACs / VKAs) initiation versus active bleeding risk mitigation.
+## Browser use
 
-### Scoring Systems
+Open the live application above, enter age, select the applicable stroke and bleeding risk factors, and choose **Calculate scores**. Stroke history and age >65 are carried into HAS-BLED automatically.
 
-#### 1. CHA2DS2-VASc Score (Thromboembolic Stroke Risk)
-| Factor | Criteria | Points |
-|:---|:---|:---|
-| **C** | Congestive Heart Failure / LVEF $\le 40\%$ | +1 |
-| **H** | Hypertension (or on antihypertensive therapy) | +1 |
-| **A2** | Age $\ge 75$ years | +2 |
-| **D** | Diabetes Mellitus | +1 |
-| **S2** | Prior Stroke, TIA, or Thromboembolism | +2 |
-| **V** | Vascular Disease (Prior MI, PAD, or Complex Aortic Plaque) | +1 |
-| **A** | Age 65 to 74 years | +1 |
-| **Sc** | Sex Category (Female) | +1 |
+The browser application is static HTML/CSS/JavaScript. Patient inputs are processed locally in the browser and are not transmitted or persisted. Only the light/dark theme preference may be stored in browser local storage.
 
-*Max Score: 9 points.*
+## Command line
 
-| Score | Adjusted Annual Stroke Risk | Anticoagulation Recommendation (AHA/ACC & ESC) |
-|:---|:---|:---|
-| **0 (Men) / 1 (Women)** | 0.0% – 0.2% | **Low Risk**: No oral anticoagulation recommended. |
-| **1 (Men) / 2 (Women)** | 0.6% – 1.3% | **Intermediate Risk**: Oral anticoagulation may be considered based on clinical judgment. |
-| **$\ge 2$ (Men) / $\ge 3$ (Women)** | 2.2% – 15.2% | **High Risk**: Oral anticoagulation strongly recommended (DOAC preferred over Warfarin). |
+Requires Python 3.10 or newer. No third-party Python packages are required.
 
-#### 2. HAS-BLED Score (1-Year Major Bleeding Risk)
-- **H**: Hypertension (uncontrolled, SBP > 160 mmHg) (+1)
-- **A**: Abnormal renal or liver function (+1 or +2)
-- **S**: Stroke history (+1)
-- **B**: Bleeding history or predisposition (+1)
-- **L**: Labile INRs (TTR < 60%) (+1)
-- **E**: Elderly (Age > 65) (+1)
-- **D**: Drugs (antiplatelets/NSAIDs) or Alcohol excess (+1 or +2)
-
-*Score $\ge 3$ represents high bleeding risk, warranting caution and regular clinical review rather than withholding anticoagulation.*
-
----
-
-## 💻 CLI Quickstart & Usage
-
-### 1. Combined Clinical Assessment
 ```bash
 python cli.py assess --age 72 --chf --hypertension --diabetes --female
-```
-
-### 2. Isolated CHA2DS2-VASc Calculation
-```bash
 python cli.py chadsvasc --age 68 --stroke-tia --vascular-disease
+python cli.py hasbled --age 70 --hypertension-uncontrolled --bleeding-history
+python cli.py batch -i sample.csv -o results.csv
 ```
 
-### 3. Isolated HAS-BLED Calculation
+For standalone HAS-BLED calculation, `--elderly` can be used instead of `--age` when age >65 is already known.
+
+## Testing
+
 ```bash
-python cli.py hasbled --hypertension-uncontrolled --elderly --bleeding-history
+python -m compileall -q chadsvasc.py cli.py tests
+python -m unittest discover -s tests -v
+python cli.py batch -i sample.csv -o out_smoke.csv
+node --check app.js
 ```
 
-### 4. Batch Process Patient CSV Dataset
-```bash
-python cli.py batch -i sample.csv -o out_results.csv
-```
+GitHub Actions runs the Python test matrix on 3.10–3.13 and checks the browser JavaScript syntax. The Pages workflow deploys the static site from `master`.
 
----
+## Clinical scope and references
 
-## 🧪 Verification & Testing
+This repository is clinical decision-support software, not a substitute for patient-specific assessment. Anticoagulation decisions require confirmation of indication, contraindications, drug choice/dose, renal function, interacting therapies, bleeding-risk mitigation, and current local guidance.
 
-Execute comprehensive unit tests via pytest:
-```bash
-python -m pytest -p no:zarr
-```
+Key references:
+
+- 2023 ACC/AHA/ACCP/HRS Guideline for the Diagnosis and Management of Atrial Fibrillation. *Circulation*. DOI: 10.1161/CIR.0000000000001193.
+- 2024 ESC Guidelines for the management of atrial fibrillation. *European Heart Journal*. DOI: 10.1093/eurheartj/ehae176.
+- Lip GYH, Nieuwlaat R, Pisters R, Lane DA, Crijns HJGM. *Chest*. 2010;137(2):263–272. DOI: 10.1378/chest.09-1584.
+- Pisters R, Lane DA, Nieuwlaat R, de Vos CB, Crijns HJGM, Lip GYH. *Chest*. 2010;138(5):1093–1100. DOI: 10.1378/chest.10-0134.
+
+Historical annual stroke percentages in the calculator are cohort estimates and should not be treated as current patient-specific absolute risk.
+
+## Technology and browser compatibility
+
+The web application uses standards-based HTML, CSS, and vanilla JavaScript with no external runtime dependencies. Current versions of Chrome, Edge, Firefox, and Safari are recommended. The Python CLI uses only the standard library.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
